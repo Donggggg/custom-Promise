@@ -67,4 +67,20 @@ export default class Promise {
         break;
     }
   }
+
+  finally(callback) {
+    switch (this.state) {
+      case status.PENDING:
+        this.fulfilledCallStacks.push(callback);
+        break;
+      case status.FULFILLED:
+        callback(this.result);
+        break;
+      case status.REJECTED:
+        callback(this.result);
+        break;
+      default:
+        break;
+    }
+  }
 }
