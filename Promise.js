@@ -52,4 +52,19 @@ export default class Promise {
         break;
     }
   }
+
+  catch(error) {
+    switch (this.state) {
+      case status.PENDING:
+        this.rejectedCallStacks.push(error);
+        break;
+      case status.FULFILLED:
+        break;
+      case status.REJECTED:
+        error(this.result);
+        break;
+      default:
+        break;
+    }
+  }
 }
