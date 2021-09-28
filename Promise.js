@@ -8,6 +8,8 @@ const status = {
 export default class Promise {
   state = status.PENDING;
   result = undefined;
+  fulfilledCallStacks = [];
+  rejectedCallStacks = [];
 
   constructor(executor) {
     console.log("Promise 객체 생성");
@@ -20,6 +22,8 @@ export default class Promise {
     this.result = value;
     this.state = status.FULFILLED;
     console.log("resolve");
+
+    this.fulfilledCallStacks.forEach((callback) => callback(this.result));
   }
 
   reject(error) {
@@ -28,5 +32,24 @@ export default class Promise {
     this.result = error;
     this.state = status.REJECTED;
     console.log("reject");
+
+    this.rejectedCallStacks.forEach((error) => error(this.result));
+  }
+
+  then(callback, error) {
+    switch (this.state) {
+      case status.PENDING:
+        this.fulfilledCallStacks.push(callback);
+        this.rejectedCallStacks.push(error);
+        break;
+      case status.FULFILLED:
+        callback(this.result);
+        break;
+      case status.REJECTED:
+        error(this.result);
+        break;
+      default:
+        break;
+    }
   }
 }
