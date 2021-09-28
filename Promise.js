@@ -2,7 +2,6 @@ const status = {
   PENDING: "pending",
   FULFILLED: "fulfilled",
   REJECTED: "rejected",
-  SETTLED: "settled",
 };
 
 export default class Promise {
@@ -12,59 +11,73 @@ export default class Promise {
   rejectedCallStacks = [];
 
   constructor(executor) {
-    console.log("Promise 객체 생성");
+    this.executor = executor;
     executor(this.resolve.bind(this), this.reject.bind(this));
   }
 
   resolve(value) {
     if (this.state !== status.PENDING) return;
-
     this.result = value;
     this.state = status.FULFILLED;
-    console.log("resolve");
-
     this.fulfilledCallStacks.forEach((callback) => callback(this.result));
+    return this;
   }
 
   reject(error) {
     if (this.state !== status.PENDING) return;
-
     this.result = error;
     this.state = status.REJECTED;
-    console.log("reject");
-
     this.rejectedCallStacks.forEach((error) => error(this.result));
+    return this;
   }
 
   then(callback, error) {
-    switch (this.state) {
-      case status.PENDING:
-        this.fulfilledCallStacks.push(callback);
-        this.rejectedCallStacks.push(error);
-        break;
-      case status.FULFILLED:
-        callback(this.result);
-        break;
-      case status.REJECTED:
-        error(this.result);
-        break;
-      default:
-        break;
+    try {
+      if (callback === undefined) throw "error";
+
+      return new Promise((resolve, reject) => {
+        switch (this.state) {
+          case status.PENDING:
+            this.fulfilledCallStacks.push(() => {
+              this.handleCallback(callback, resolve, reject);
+            });
+            if (error !== undefined)
+              this.rejectedCallStacks.push(() => {
+                this.handleCallback(error, resolve, reject);
+              });
+            break;
+          case status.FULFILLED:
+            this.handleCallback(callback, resolve, reject);
+            break;
+          case status.REJECTED:
+            if (error === undefined) throw "error";
+            this.handleCallback(error, resolve, reject);
+            break;
+        }
+      });
+    } catch (error) {
+      console.log(error);
     }
   }
 
   catch(error) {
-    switch (this.state) {
-      case status.PENDING:
-        this.rejectedCallStacks.push(error);
-        break;
-      case status.FULFILLED:
-        break;
-      case status.REJECTED:
-        error(this.result);
-        break;
-      default:
-        break;
+    try {
+      if (error === undefined) throw "error";
+
+      return new Promise((resolve, reject) => {
+        switch (this.state) {
+          case status.PENDING:
+            this.rejectedCallStacks.push(() => {
+              this.handleCallback(error, resolve, reject);
+            });
+            break;
+          case status.REJECTED:
+            this.handleCallback(error, resolve, reject);
+            break;
+        }
+      });
+    } catch (error) {
+      console.log(error);
     }
   }
 
@@ -79,8 +92,20 @@ export default class Promise {
       case status.REJECTED:
         callback(this.result);
         break;
-      default:
-        break;
     }
+  }
+
+  handleCallback(callback, resolve, reject) {
+    const result = callback(this.result);
+    if (result instanceof Promise) {
+      if (result.state === status.FULFILLED) {
+        resolve(result);
+      } else if (result.state === status.REJECTED) {
+        reject(result);
+      } else if (result.state === status.PENDING) {
+        result.fulfilledCallStacks.push(() => result.then(resolve));
+        result.rejectedCallStacks.push(() => result.catch(reject));
+      }
+    } else resolve(result);
   }
 }
