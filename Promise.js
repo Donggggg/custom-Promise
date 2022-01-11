@@ -1,12 +1,12 @@
 const status = {
-  PENDING: "pending",
-  FULFILLED: "fulfilled",
-  REJECTED: "rejected",
+  PENDING: 0,
+  FULFILLED: 1,
+  REJECTED: 2,
 };
 
 export default class Promise {
   state = status.PENDING;
-  result = undefined;
+  value = null;
   fulfilledCallStacks = [];
   rejectedCallStacks = [];
 
@@ -17,23 +17,27 @@ export default class Promise {
 
   resolve(value) {
     if (this.state !== status.PENDING) return;
-    this.result = value;
+
+    this.value = value;
     this.state = status.FULFILLED;
-    this.fulfilledCallStacks.forEach((callback) => callback(this.result));
+    this.fulfilledCallStacks.forEach((callback) => callback(this.value));
+
     return this;
   }
 
   reject(error) {
     if (this.state !== status.PENDING) return;
-    this.result = error;
+
+    this.value = error;
     this.state = status.REJECTED;
-    this.rejectedCallStacks.forEach((error) => error(this.result));
+    this.rejectedCallStacks.forEach((error) => error(this.value));
+
     return this;
   }
 
   then(callback, error) {
     try {
-      if (callback === undefined) throw "error";
+      if (!callback) throw "error";
 
       return new Promise((resolve, reject) => {
         switch (this.state) {
@@ -41,16 +45,18 @@ export default class Promise {
             this.fulfilledCallStacks.push(() => {
               this.handleCallback(callback, resolve, reject);
             });
-            if (error !== undefined)
+
+            if (error)
               this.rejectedCallStacks.push(() => {
                 this.handleCallback(error, resolve, reject);
               });
+
             break;
           case status.FULFILLED:
             this.handleCallback(callback, resolve, reject);
             break;
           case status.REJECTED:
-            if (error === undefined) throw "error";
+            if (!(error instanceof Function)) throw "error";
             this.handleCallback(error, resolve, reject);
             break;
         }
@@ -62,7 +68,7 @@ export default class Promise {
 
   catch(error) {
     try {
-      if (error === undefined) throw "error";
+      if (!error) throw "error";
 
       return new Promise((resolve, reject) => {
         switch (this.state) {
@@ -87,25 +93,26 @@ export default class Promise {
         this.fulfilledCallStacks.push(callback);
         break;
       case status.FULFILLED:
-        callback(this.result);
+        callback(this.value);
         break;
       case status.REJECTED:
-        callback(this.result);
+        callback(this.value);
         break;
     }
   }
 
   handleCallback(callback, resolve, reject) {
-    const result = callback(this.result);
-    if (result instanceof Promise) {
-      if (result.state === status.FULFILLED) {
-        resolve(result);
-      } else if (result.state === status.REJECTED) {
-        reject(result);
-      } else if (result.state === status.PENDING) {
-        result.fulfilledCallStacks.push(() => result.then(resolve));
-        result.rejectedCallStacks.push(() => result.catch(reject));
+    const value = callback(this.value);
+
+    if (value instanceof Promise) {
+      if (value.state === status.FULFILLED) {
+        resolve(value);
+      } else if (value.state === status.REJECTED) {
+        reject(value);
+      } else if (value.state === status.PENDING) {
+        value.fulfilledCallStacks.push(() => value.then(resolve));
+        value.rejectedCallStacks.push(() => value.catch(reject));
       }
-    } else resolve(result);
+    } else resolve(value);
   }
 }
